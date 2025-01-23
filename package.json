@@ -1,0 +1,21 @@
+{
+  "name": "changelog-api",
+  "version": "1.0.0",
+  "main": "dist/server.js",
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "build": "tsc",
+    "dev": "bun --watch run src/server.ts"
+  },
+  "dependencies": {
+    "@octokit/rest": "21.1.0",
+    "express": "5.0.1",
+    "lodash": "4.17.21"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.0",
+    "@types/lodash": "4.17.14",
+    "@types/node": "22.10.8",
+    "typescript": "5.7.3"
+  }
+}
