@@ -64,10 +64,17 @@ import { useSeoMeta, useHead } from "#imports";
 useSeoMeta({
   title: "Changelog Generator",
   description: "Generate changelogs from GitHub repositories",
-  ogTitle: "Changelog Generator",
+  ogTitle: "Changelog Generator", 
   ogDescription: "Generate changelogs from GitHub repositories",
-  ogImage: "/og-image.jpg",
+  ogImage: "/logo.webp",
+  ogType: "website",
+  ogUrl: "https://changelog.pandadev.net",
+  twitterTitle: "Changelog Generator",
+  twitterDescription: "Generate changelogs from GitHub repositories",
+  twitterImage: "/logo.webp",
   twitterCard: "summary_large_image",
+  twitterSite: "@pandadev_",
+  twitterCreator: "@pandadev_"
 });
 
 useHead({
