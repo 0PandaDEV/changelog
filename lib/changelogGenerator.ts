@@ -12,11 +12,36 @@ export class ChangelogGenerator {
     const { data: tags } = await this.octokit.repos.listTags({
       owner,
       repo,
-      per_page: 1
+      per_page: 100
     })
+
     const { data: repoData } = await this.octokit.repos.get({ owner, repo })
     const defaultBranch = repoData.default_branch
-    return { latest: defaultBranch, previous: tags[0]?.name || defaultBranch }
+
+    if (tags.length === 0) {
+      return { latest: defaultBranch, previous: defaultBranch }
+    }
+
+    const tagDetails = await Promise.all(
+      tags.map(async (tag) => {
+        const { data: commit } = await this.octokit.git.getCommit({
+          owner,
+          repo,
+          commit_sha: tag.commit.sha,
+        })
+        return {
+          name: tag.name,
+          date: new Date(commit.committer.date)
+        }
+      })
+    )
+
+    tagDetails.sort((a, b) => b.date.getTime() - a.date.getTime())
+
+    return { 
+      latest: defaultBranch,
+      previous: tagDetails[0].name
+    }
   }
 
   private async getCommits(owner: string, repo: string, head: string, base: string) {
