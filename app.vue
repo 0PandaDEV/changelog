@@ -2,7 +2,10 @@
   <div class="container">
     <NuxtRouteAnnouncer />
     <div class="sidebar">
-      <h1>Changelog Generator</h1>
+      <div class="header">
+        <img src="/logo.webp" alt="Logo" class="logo" />
+        <h1>Changelog Generator</h1>
+      </div>
       <div class="input-group">
         <label for="githubUrl">GitHub URL:</label>
         <input
@@ -37,12 +40,10 @@
         <div class="changelog-header">
           <div class="changelog-info">
             <h2>Changelog</h2>
-            <span class="tag-range">
-              {{ fromTag }} → {{ toTag }}
-            </span>
+            <span class="tag-range"> {{ fromTag }} → {{ toTag }} </span>
           </div>
           <button class="copy-button" @click="copyChangelog">
-            {{ copied ? 'Copied!' : 'Copy' }}
+            {{ copied ? "Copied!" : "Copy" }}
           </button>
         </div>
         <div v-html="markdownToHtml" class="markdown-content"></div>
@@ -53,46 +54,46 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import MarkdownIt from 'markdown-it'
-import MarkdownItGitHubAlerts from 'markdown-it-github-alerts'
+import MarkdownIt from "markdown-it";
+import MarkdownItGitHubAlerts from "markdown-it-github-alerts";
 import type { ChangelogOptions } from "./types/types";
-import * as emoji from 'node-emoji'
-import { ChangelogGenerator } from './lib/changelogGenerator'
-import { useSeoMeta, useHead } from '#imports'
+import * as emoji from "node-emoji";
+import { ChangelogGenerator } from "./lib/changelogGenerator";
+import { useSeoMeta, useHead } from "#imports";
 
 useSeoMeta({
-  title: 'Changelog Generator',
-  description: 'Generate changelogs from GitHub repositories',
-  ogTitle: 'Changelog Generator',
-  ogDescription: 'Generate changelogs from GitHub repositories',
-  ogImage: '/og-image.jpg',
-  twitterCard: 'summary_large_image',
-})
+  title: "Changelog Generator",
+  description: "Generate changelogs from GitHub repositories",
+  ogTitle: "Changelog Generator",
+  ogDescription: "Generate changelogs from GitHub repositories",
+  ogImage: "/og-image.jpg",
+  twitterCard: "summary_large_image",
+});
 
 useHead({
   htmlAttrs: {
-    lang: 'en'
+    lang: "en",
   },
   link: [
     {
-      rel: 'icon',
-      type: 'image/png',
-      href: '/favicon.png'
-    }
+      rel: "icon",
+      type: "image/x-icon",
+      href: "/favicon.ico",
+    },
   ],
   meta: [
-    { name: 'theme-color', content: '#010409' },
-    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-    { name: 'format-detection', content: 'telephone=no' }
-  ]
-})
+    { name: "theme-color", content: "#010409" },
+    { name: "viewport", content: "width=device-width, initial-scale=1" },
+    { name: "format-detection", content: "telephone=no" },
+  ],
+});
 
 const md = MarkdownIt({
   html: true,
   linkify: true,
-  typographer: true
-})
-md.use(MarkdownItGitHubAlerts)
+  typographer: true,
+});
+md.use(MarkdownItGitHubAlerts);
 
 const githubUrl = ref("");
 const token = ref("");
@@ -100,8 +101,8 @@ const changelog = ref("");
 const loading = ref(false);
 const error = ref("");
 const copied = ref(false);
-const fromTag = ref('');
-const toTag = ref('');
+const fromTag = ref("");
+const toTag = ref("");
 const options = ref<Partial<ChangelogOptions>>({
   excludeTypes: ["build", "docs", "other", "style"],
   includeRefIssues: true,
@@ -111,46 +112,50 @@ const options = ref<Partial<ChangelogOptions>>({
 });
 
 async function generate() {
-  loading.value = true
-  error.value = ''
-  changelog.value = ''
-  
+  loading.value = true;
+  error.value = "";
+  changelog.value = "";
+
   try {
-    const generator = new ChangelogGenerator(token.value)
+    const generator = new ChangelogGenerator(token.value);
     const result = await generator.generate({
       githubUrl: githubUrl.value,
-      ...options.value
-    } as ChangelogOptions)
-    
-    changelog.value = result.changelog
-    fromTag.value = result.fromTag
-    toTag.value = result.toTag
+      ...options.value,
+    } as ChangelogOptions);
+
+    changelog.value = result.changelog;
+    fromTag.value = result.fromTag;
+    toTag.value = result.toTag;
   } catch (e: any) {
-    error.value = e.message || 'An unexpected error occurred'
+    error.value = e.message || "An unexpected error occurred";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function copyChangelog() {
   await navigator.clipboard.writeText(changelog.value);
   copied.value = true;
-  setTimeout(() => copied.value = false, 2000);
+  setTimeout(() => (copied.value = false), 2000);
 }
 
 const markdownToHtml = computed(() => {
   let content = changelog.value;
-  content = content.replace(/:([\w+-]+):/g, (match, code) => emoji.get(code) || match);
+  content = content.replace(
+    /:([\w+-]+):/g,
+    (match, code) => emoji.get(code) || match
+  );
   return `<div class="markdown-body">${md.render(content)}</div>`;
 });
 </script>
 
 <style>
-@import 'github-markdown-css/github-markdown-dark.css';
-@import 'markdown-it-github-alerts/styles/github-colors-dark-media.css';
-@import 'markdown-it-github-alerts/styles/github-base.css';
+@import "github-markdown-css/github-markdown-dark.css";
+@import "markdown-it-github-alerts/styles/github-colors-dark-media.css";
+@import "markdown-it-github-alerts/styles/github-base.css";
 
-*, body {
+*,
+body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -158,7 +163,8 @@ const markdownToHtml = computed(() => {
 
 .container {
   background-color: #010409;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+    Helvetica, Arial, sans-serif;
   color: #c9d1d9;
   position: relative;
   min-height: 100vh;
@@ -185,9 +191,22 @@ const markdownToHtml = computed(() => {
   flex-direction: column;
 }
 
-h1 {
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   margin-bottom: 2rem;
+}
+
+h1 {
   color: #c9d1d9;
+  font-size: 20px;
+  white-space: nowrap;
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
 }
 
 .input-group {
@@ -216,7 +235,7 @@ input[type="text"]:focus,
 input[type="password"]:focus {
   outline: none;
   border-color: #58a6ff;
-  box-shadow: 0 0 0 3px rgba(88,166,255,0.3);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
 }
 
 .generate-button {
@@ -224,7 +243,7 @@ input[type="password"]:focus {
   background-color: #238636;
   color: #ffffff;
   padding: 0.75rem 1rem;
-  border: 1px solid rgba(240,246,252,0.1);
+  border: 1px solid rgba(240, 246, 252, 0.1);
   border-radius: 6px;
   font-size: 1rem;
   cursor: pointer;
@@ -295,7 +314,8 @@ input[type="password"]:focus {
   margin: 0 auto;
   color: #c9d1d9;
   background: #010409;
-  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+    Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 .markdown-content :deep(blockquote) {
