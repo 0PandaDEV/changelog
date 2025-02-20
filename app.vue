@@ -80,6 +80,21 @@ useHead({
       type: "image/x-icon",
       href: "/favicon.ico",
     },
+    {
+      rel: 'preload',
+      href: 'github-markdown-css/github-markdown-dark.css',
+      as: 'style'
+    },
+    {
+      rel: 'preload', 
+      href: 'markdown-it-github-alerts/styles/github-colors-dark-media.css',
+      as: 'style'
+    },
+    {
+      rel: 'preload',
+      href: 'markdown-it-github-alerts/styles/github-base.css', 
+      as: 'style'
+    }
   ],
   meta: [
     { name: "theme-color", content: "#010409" },
