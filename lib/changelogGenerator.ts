@@ -47,6 +47,7 @@ export class ChangelogGenerator {
   private async getCommits(owner: string, repo: string, head: string, base: string) {
     const commits = []
     let page = 1
+
     while (true) {
       const { data } = await this.octokit.repos.compareCommits({
         owner,
@@ -60,14 +61,18 @@ export class ChangelogGenerator {
       if (data.commits.length < 100) break
       page++
     }
-    return commits
+    return commits.reverse()
   }
 
   private parseCommits(commits: any[]): ParsedCommit[] {
     return commits.map(commit => {
       const message = commit.commit.message
-      const regex = /^(\w+)(?:\(([^)]+)\))?(?:!)?: (.+)/
-      const match = message.split('\n')[0].match(regex)
+      const firstLine = message.split('\n')[0].trim()
+      
+      // Try conventional commit format first
+      const conventionalRegex = /^(\w+)(?:\(([^)]+)\))?(?:!)?: (.+)/
+      const match = firstLine.match(conventionalRegex)
+      
       if (match) {
         const [, type, scope, subject] = match
         return {
@@ -81,9 +86,12 @@ export class ChangelogGenerator {
           authorUrl: commit.author?.html_url
         }
       }
+      
+      // If not conventional, treat the whole first line as subject
       return {
         type: 'other',
-        subject: message.split('\n')[0],
+        subject: firstLine,
+        body: message.split('\n\n')[1],
         sha: commit.sha,
         url: commit.html_url,
         author: commit.author?.login,
@@ -110,7 +118,7 @@ export class ChangelogGenerator {
     if (options.reverseOrder) commits.reverse()
 
     for (const type of types) {
-      if (options.excludeTypes?.includes(type.types[0])) continue
+      if (type.types[0] !== 'other' && options.excludeTypes?.includes(type.types[0])) continue
 
       const typeCommits = commits.filter(c =>
         type.types.includes(c.type || 'other') &&
