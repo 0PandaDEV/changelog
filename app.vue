@@ -312,6 +312,22 @@ input[type="password"]:focus {
   flex-grow: 1;
 }
 
+.markdown-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.markdown-content::-webkit-scrollbar-track {
+  background: #010409;
+}
+
+.markdown-content::-webkit-scrollbar-thumb {
+  background: #30363d;
+}
+
+.markdown-content::-webkit-scrollbar-thumb:hover {
+  background: #3f4751;
+}
+
 .loading {
   text-align: center;
   color: #8b949e;
