@@ -1,75 +1,42 @@
-# Nuxt Minimal Starter
+# GitHub Changelog Generator
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+A modern web application that generates beautiful changelogs from GitHub repositories. Built with Nuxt 3.
+
+## Features
+
+- Generate changelogs from any public GitHub repository
+- Support for private repositories with GitHub token
+- Filter by tags and commit types
+- Gitmoji support
+- Markdown rendering with GitHub styling
+- Mobile responsive design
+- Copy to clipboard functionality
 
 ## Setup
 
-Make sure to install dependencies:
-
 ```bash
-# npm
+# Install dependencies
 npm install
 
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
+# Start development server
 npm run dev
 
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-# npm
+# Build for production
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
 ```
 
-Locally preview production build:
+## Environment Variables
 
-```bash
-# npm
-npm run preview
+Create a `.env` file in the root directory:
 
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
+```env
+GITHUB_TOKEN=your_github_token_here # Optional for private repos
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## Tech Stack
+
+- Nuxt 3
+- Vue 3
+- TypeScript
+- GitHub API
+- Markdown-it
