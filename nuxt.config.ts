@@ -4,9 +4,6 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   app: {
     head: {
-      meta: [
-        { 'http-equiv': 'Content-Security-Policy', content: "default-src 'self'; connect-src 'self' plausible.pandadev.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' static.cloudflareinsights.com plausible.pandadev.net; style-src 'self' 'unsafe-inline';" }
-      ],
       script: process.env.NODE_ENV === 'production' ? [
         {
           src: 'https://plausible.pandadev.net/js/script.tagged-events.js',
