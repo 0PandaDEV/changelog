@@ -1,6 +1,6 @@
 # 🚀 GitHub Changelog Generator
 
-A modern web application that generates beautiful changelogs from GitHub repositories. Built with Nuxt 3.
+A modern, fully client-side web application that generates beautiful changelogs from GitHub repositories.
 
 ## ✨ Features
 
@@ -11,6 +11,7 @@ A modern web application that generates beautiful changelogs from GitHub reposit
 - ⭐ Markdown rendering with GitHub styling
 - 📱 Mobile responsive design
 - 📋 Copy to clipboard functionality
+- 🌐 Fully client-side - no server needed
 
 ## 🛠️ Setup
 
