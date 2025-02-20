@@ -26,7 +26,7 @@
         <label for="toTag">To Tag (optional):</label>
         <input id="toTag" v-model="options.toTag" type="text" />
       </div>
-      <button class="generate-button" @click.prevent="generate">
+      <button class="generate-button plausible-event-name=Generate" @click.prevent="generate">
         Generate Changelog
       </button>
       <div v-if="loading" class="loading">Loading...</div>
@@ -42,7 +42,7 @@
             <h2>Changelog</h2>
             <span class="tag-range"> {{ fromTag }} → {{ toTag }} </span>
           </div>
-          <button class="copy-button" @click="copyChangelog">
+          <button class="copy-button plausible-event-name=Copy" @click="copyChangelog">
             {{ copied ? "Copied!" : "Copy" }}
           </button>
         </div>
