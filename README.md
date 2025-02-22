@@ -1,5 +1,7 @@
 # 🚀 GitHub Changelog Generator
 
+Try it at: https://changelog.pandadev.net
+
 A modern, fully client-side web application that generates beautiful changelogs from GitHub repositories.
 
 ![image](https://github.com/user-attachments/assets/17f8acb9-adc5-4db2-843e-e3e83579d79e)
