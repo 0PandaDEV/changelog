@@ -11,6 +11,13 @@ export default defineNuxtConfig({
           "data-domain": "changelog.pandadev.net",
         },
       ],
+      link: [
+        {
+          rel: "preload",
+          href: "/github-markdown-css/github-markdown-dark.css",
+          as: "style",
+        },
+      ],
     },
   },
   nitro: {
