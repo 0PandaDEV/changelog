@@ -4,13 +4,16 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   app: {
     head: {
-      script: [
-        {
-          src: "https://plausible.pandadev.net/js/script.pageview-props.tagged-events.js",
-          defer: true,
-          "data-domain": "changelog.pandadev.net",
-        },
-      ],
+      script:
+        process.env.NODE_ENV === "production"
+          ? [
+              {
+                src: "https://plausible.pandadev.net/js/script.pageview-props.tagged-events.js",
+                defer: true,
+                "data-domain": "changelog.pandadev.net",
+              },
+            ]
+          : [],
       link: [
         {
           rel: "preload",
