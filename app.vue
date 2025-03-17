@@ -26,7 +26,13 @@
         <label for="toTag">To Tag (optional):</label>
         <input id="toTag" v-model="options.toTag" type="text" />
       </div>
-      <button class="generate-button plausible-event-name=Generate" @click.prevent="generate">
+      <button 
+        :class="[
+          'generate-button',
+          'plausible-event-name=Generate',
+          `plausible-event-repository=${encodeURIComponent(githubUrl)}`
+        ]" 
+        @click.prevent="generate">
         Generate Changelog
       </button>
       <div v-if="loading" class="loading">Loading...</div>
@@ -42,7 +48,13 @@
             <h2>Changelog</h2>
             <span class="tag-range"> {{ fromTag }} → {{ toTag }} </span>
           </div>
-          <button class="copy-button plausible-event-name=Copy" @click="copyChangelog">
+          <button 
+            :class="[
+              'copy-button',
+              'plausible-event-name=Copy',
+              `plausible-event-repository=${encodeURIComponent(githubUrl)}`
+            ]" 
+            @click="copyChangelog">
             {{ copied ? "Copied!" : "Copy" }}
           </button>
         </div>
@@ -55,7 +67,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import MarkdownIt from "markdown-it";
-import MarkdownItGitHubAlerts from "markdown-it-github-alerts";
 import type { ChangelogOptions } from "./types/types";
 import * as emoji from "node-emoji";
 import { ChangelogGenerator } from "./lib/changelogGenerator";
@@ -92,16 +103,6 @@ useHead({
       href: 'github-markdown-css/github-markdown-dark.css',
       as: 'style'
     },
-    {
-      rel: 'preload', 
-      href: 'markdown-it-github-alerts/styles/github-colors-dark-media.css',
-      as: 'style'
-    },
-    {
-      rel: 'preload',
-      href: 'markdown-it-github-alerts/styles/github-base.css', 
-      as: 'style'
-    }
   ],
   meta: [
     { name: "theme-color", content: "#010409" },
@@ -115,7 +116,6 @@ const md = MarkdownIt({
   linkify: true,
   typographer: true,
 });
-md.use(MarkdownItGitHubAlerts);
 
 const githubUrl = ref("");
 const token = ref("");
@@ -173,8 +173,6 @@ const markdownToHtml = computed(() => {
 
 <style>
 @import "github-markdown-css/github-markdown-dark.css";
-@import "markdown-it-github-alerts/styles/github-colors-dark-media.css";
-@import "markdown-it-github-alerts/styles/github-base.css";
 
 *,
 body {
