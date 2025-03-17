@@ -30,7 +30,7 @@
         :class="[
           'generate-button',
           'plausible-event-name=Generate',
-          `plausible-event-repository=${encodeURIComponent(githubUrl)}`
+          `plausible-event-repository=${githubUrl}`
         ]" 
         @click.prevent="generate">
         Generate Changelog
@@ -52,7 +52,7 @@
             :class="[
               'copy-button',
               'plausible-event-name=Copy',
-              `plausible-event-repository=${encodeURIComponent(githubUrl)}`
+              `plausible-event-repository=${githubUrl}`
             ]" 
             @click="copyChangelog">
             {{ copied ? "Copied!" : "Copy" }}
