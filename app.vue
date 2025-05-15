@@ -26,12 +26,10 @@
         <label for="toTag">To Tag (optional):</label>
         <input id="toTag" v-model="options.toTag" type="text" />
       </div>
-      <button 
-        :class="[
-          'generate-button',
-          'plausible-event-name=Generate',
-          `plausible-event-repository=${githubUrl}`
-        ]" 
+      <button
+        class="generate-button"
+        data-plausible-event-name="Generate"
+        :data-plausible-event-repository="githubUrl"
         @click.prevent="generate">
         Generate Changelog
       </button>
@@ -48,12 +46,10 @@
             <h2>Changelog</h2>
             <span class="tag-range"> {{ fromTag }} → {{ toTag }} </span>
           </div>
-          <button 
-            :class="[
-              'copy-button',
-              'plausible-event-name=Copy',
-              `plausible-event-repository=${githubUrl}`
-            ]" 
+          <button
+            class="copy-button"
+            data-plausible-event-name="Copy"
+            :data-plausible-event-repository="githubUrl"
             @click="copyChangelog">
             {{ copied ? "Copied!" : "Copy" }}
           </button>
@@ -75,7 +71,7 @@ import { useSeoMeta, useHead } from "#imports";
 useSeoMeta({
   title: "Changelog Generator",
   description: "Generate changelogs from GitHub repositories",
-  ogTitle: "Changelog Generator", 
+  ogTitle: "Changelog Generator",
   ogDescription: "Generate changelogs from GitHub repositories",
   ogImage: "/logo.webp",
   ogType: "website",
@@ -85,7 +81,7 @@ useSeoMeta({
   twitterImage: "/logo.webp",
   twitterCard: "summary_large_image",
   twitterSite: "@pandadev_",
-  twitterCreator: "@pandadev_"
+  twitterCreator: "@pandadev_",
 });
 
 useHead({
@@ -99,9 +95,9 @@ useHead({
       href: "/favicon.ico",
     },
     {
-      rel: 'preload',
-      href: 'github-markdown-css/github-markdown-dark.css',
-      as: 'style'
+      rel: "preload",
+      href: "github-markdown-css/github-markdown-dark.css",
+      as: "style",
     },
   ],
   meta: [
