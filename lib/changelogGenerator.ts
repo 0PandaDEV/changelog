@@ -6,14 +6,45 @@ import type {
   TagPair,
 } from "../types/types";
 
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
 export class ChangelogGenerator {
   private octokit: Octokit;
+  private cache: Map<string, CacheEntry<any>>;
+  private cacheTTL: number = 3600000;
 
   constructor(token?: string) {
     this.octokit = new Octokit({ auth: token });
+    this.cache = new Map();
+  }
+
+  private getCacheKey(method: string, params: Record<string, any>): string {
+    return `${method}:${JSON.stringify(params)}`;
+  }
+
+  private getFromCache<T>(cacheKey: string): T | null {
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
+      return cached.data;
+    }
+    return null;
+  }
+
+  private saveToCache<T>(cacheKey: string, data: T): void {
+    this.cache.set(cacheKey, {
+      data,
+      timestamp: Date.now(),
+    });
   }
 
   private async getTags(owner: string, repo: string): Promise<TagPair> {
+    const cacheKey = this.getCacheKey("getTags", { owner, repo });
+    const cached = this.getFromCache<TagPair>(cacheKey);
+    if (cached) return cached;
+
     const { data: tags } = await this.octokit.repos.listTags({
       owner,
       repo,
@@ -24,16 +55,33 @@ export class ChangelogGenerator {
     const defaultBranch = repoData.default_branch;
 
     if (tags.length === 0) {
-      return { latest: defaultBranch, previous: "" };
+      const result = { latest: defaultBranch, previous: "" };
+      this.saveToCache(cacheKey, result);
+      return result;
     }
 
     const tagDetails = await Promise.all(
       tags.map(async (tag) => {
-        const { data: commit } = await this.octokit.git.getCommit({
+        const commitCacheKey = this.getCacheKey("getCommit", {
           owner,
           repo,
           commit_sha: tag.commit.sha,
         });
+        const cachedCommit = this.getFromCache<any>(commitCacheKey);
+
+        let commit;
+        if (cachedCommit) {
+          commit = cachedCommit;
+        } else {
+          const { data } = await this.octokit.git.getCommit({
+            owner,
+            repo,
+            commit_sha: tag.commit.sha,
+          });
+          this.saveToCache(commitCacheKey, data);
+          commit = data;
+        }
+
         return {
           name: tag.name,
           date: new Date(commit.committer.date),
@@ -43,10 +91,13 @@ export class ChangelogGenerator {
 
     tagDetails.sort((a, b) => b.date.getTime() - a.date.getTime());
 
-    return {
+    const result = {
       latest: defaultBranch,
       previous: tagDetails[0].name,
     };
+
+    this.saveToCache(cacheKey, result);
+    return result;
   }
 
   private async getCommits(
@@ -55,6 +106,15 @@ export class ChangelogGenerator {
     head: string,
     base: string
   ) {
+    const cacheKey = this.getCacheKey("getCommits", {
+      owner,
+      repo,
+      head,
+      base,
+    });
+    const cached = this.getFromCache<any[]>(cacheKey);
+    if (cached) return cached;
+
     const commits = [];
     let page = 1;
 
@@ -73,6 +133,7 @@ export class ChangelogGenerator {
         if (data.length < 100) break;
         page++;
       }
+      this.saveToCache(cacheKey, commits);
       return commits;
     }
 
@@ -89,7 +150,10 @@ export class ChangelogGenerator {
       if (data.commits.length < 100) break;
       page++;
     }
-    return commits.reverse();
+
+    const result = commits.reverse();
+    this.saveToCache(cacheKey, result);
+    return result;
   }
 
   private parseCommits(commits: any[]): ParsedCommit[] {
@@ -199,6 +263,14 @@ export class ChangelogGenerator {
   async generate(
     options: ChangelogOptions
   ): Promise<{ changelog: string; fromTag: string; toTag: string }> {
+    const cacheKey = this.getCacheKey("generate", options);
+    const cached = this.getFromCache<{
+      changelog: string;
+      fromTag: string;
+      toTag: string;
+    }>(cacheKey);
+    if (cached) return cached;
+
     const { owner, repo } = this.parseGithubUrl(options.githubUrl);
     const tags = await this.getTags(owner, repo);
     const base = options.fromTag || tags.previous;
@@ -206,15 +278,17 @@ export class ChangelogGenerator {
     const commits = await this.getCommits(owner, repo, head, base);
 
     if (commits.length === 0) {
-      return {
+      const result = {
         changelog: "No changes found between these versions.",
         fromTag: base,
         toTag: head,
       };
+      this.saveToCache(cacheKey, result);
+      return result;
     }
 
     const parsedCommits = this.parseCommits(commits);
-    return {
+    const result = {
       changelog: this.generateChangelogFromCommits(
         parsedCommits,
         { latest: head, previous: base },
@@ -223,5 +297,8 @@ export class ChangelogGenerator {
       fromTag: base,
       toTag: head,
     };
+
+    this.saveToCache(cacheKey, result);
+    return result;
   }
 }

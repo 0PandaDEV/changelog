@@ -6,33 +6,35 @@
         <img src="/logo.webp" alt="Logo" class="logo" />
         <h1>Changelog Generator</h1>
       </div>
-      <div class="input-group">
-        <label for="githubUrl">GitHub URL:</label>
-        <input
-          id="githubUrl"
-          v-model="githubUrl"
-          type="text"
-          placeholder="https://github.com/owner/repo" />
-      </div>
-      <div class="input-group">
-        <label for="token">GitHub Token (optional):</label>
-        <input id="token" v-model="token" type="password" />
-      </div>
-      <div class="input-group">
-        <label for="fromTag">From Tag (optional):</label>
-        <input id="fromTag" v-model="options.fromTag" type="text" />
-      </div>
-      <div class="input-group">
-        <label for="toTag">To Tag (optional):</label>
-        <input id="toTag" v-model="options.toTag" type="text" />
-      </div>
-      <button
-        class="generate-button"
-        data-plausible-event-name="Generate"
-        :data-plausible-event-repository="githubUrl"
-        @click.prevent="generate">
-        Generate Changelog
-      </button>
+      <form @submit.prevent="generate">
+        <div class="input-group">
+          <label for="githubUrl">GitHub URL:</label>
+          <input
+            id="githubUrl"
+            v-model="githubUrl"
+            type="text"
+            placeholder="https://github.com/owner/repo" />
+        </div>
+        <div class="input-group">
+          <label for="token">GitHub Token (optional):</label>
+          <input id="token" v-model="token" type="password" />
+        </div>
+        <div class="input-group">
+          <label for="fromTag">From Tag (optional):</label>
+          <input id="fromTag" v-model="options.fromTag" type="text" />
+        </div>
+        <div class="input-group">
+          <label for="toTag">To Tag (optional):</label>
+          <input id="toTag" v-model="options.toTag" type="text" />
+        </div>
+        <button
+          type="submit"
+          class="generate-button"
+          data-plausible-event-name="Generate"
+          :data-plausible-event-repository="githubUrl">
+          Generate Changelog
+        </button>
+      </form>
       <div v-if="loading" class="loading">Loading...</div>
       <div v-if="error" class="error-output">
         <h2>Error</h2>
@@ -46,13 +48,23 @@
             <h2>Changelog</h2>
             <span class="tag-range"> {{ fromTag }} → {{ toTag }} </span>
           </div>
-          <button
-            class="copy-button"
-            data-plausible-event-name="Copy"
-            :data-plausible-event-repository="githubUrl"
-            @click="copyChangelog">
-            {{ copied ? "Copied!" : "Copy" }}
-          </button>
+          <div class="button-group">
+            <button
+              class="copy-button"
+              data-plausible-event-name="Copy"
+              :data-plausible-event-repository="githubUrl"
+              @click="copyChangelog">
+              {{ copied ? "Copied!" : "Copy" }}
+            </button>
+            <a
+              class="json-button"
+              data-plausible-event-name="View JSON"
+              :data-plausible-event-repository="githubUrl"
+              :href="jsonApiUrl"
+              target="_blank">
+              View as JSON
+            </a>
+          </div>
         </div>
         <div v-html="markdownToHtml" class="markdown-content"></div>
       </div>
@@ -61,12 +73,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import MarkdownIt from "markdown-it";
-import type { ChangelogOptions } from "./types/types";
+import type { ChangelogOptions } from "../types/types";
 import * as emoji from "node-emoji";
-import { ChangelogGenerator } from "./lib/changelogGenerator";
-import { useSeoMeta, useHead } from "#imports";
+import { ChangelogGenerator } from "../lib/changelogGenerator";
+import { useSeoMeta, useHead, useRoute, useRouter } from "#imports";
 
 useSeoMeta({
   title: "Changelog Generator",
@@ -107,6 +119,9 @@ useHead({
   ],
 });
 
+const route = useRoute();
+const router = useRouter();
+
 const md = MarkdownIt({
   html: true,
   linkify: true,
@@ -129,6 +144,119 @@ const options = ref<Partial<ChangelogOptions>>({
   reverseOrder: false,
 });
 
+const jsonApiUrl = computed(() => {
+  const params = new URLSearchParams();
+  
+  params.append("url", githubUrl.value);
+  
+  if (options.value.fromTag) {
+    params.append("fromTag", options.value.fromTag);
+  }
+  
+  if (options.value.toTag) {
+    params.append("toTag", options.value.toTag);
+  }
+  
+  if (options.value.excludeTypes && options.value.excludeTypes.length > 0) {
+    params.append("excludeTypes", JSON.stringify(options.value.excludeTypes));
+  }
+  
+  if (options.value.useGitmojis !== undefined) {
+    params.append("useGitmojis", options.value.useGitmojis.toString());
+  }
+  
+  if (options.value.reverseOrder !== undefined) {
+    params.append("reverseOrder", options.value.reverseOrder.toString());
+  }
+  
+  return `/api/changelog?${params.toString()}`;
+});
+
+onMounted(() => {
+  if (route.query.url) {
+    githubUrl.value = route.query.url as string;
+  }
+  
+  if (route.query.fromTag) {
+    options.value.fromTag = route.query.fromTag as string;
+  }
+  
+  if (route.query.toTag) {
+    options.value.toTag = route.query.toTag as string;
+  }
+  
+  if (route.query.excludeTypes) {
+    try {
+      options.value.excludeTypes = JSON.parse(
+        route.query.excludeTypes as string
+      );
+    } catch (e) {}
+  }
+  
+  if (route.query.useGitmojis !== undefined) {
+    options.value.useGitmojis = route.query.useGitmojis === "true";
+  }
+  
+  if (route.query.reverseOrder !== undefined) {
+    options.value.reverseOrder = route.query.reverseOrder === "true";
+  }
+  
+  const savedToken = localStorage.getItem("github-token");
+  if (savedToken) {
+    token.value = savedToken;
+  }
+  
+  if (githubUrl.value) {
+    generate();
+  }
+});
+
+watch(
+  [githubUrl, options],
+  () => {
+    updateUrlParams();
+  },
+  { deep: true }
+);
+
+watch(token, (newToken) => {
+  if (newToken) {
+    localStorage.setItem("github-token", newToken);
+  } else {
+    localStorage.removeItem("github-token");
+  }
+});
+
+function updateUrlParams() {
+  const query: Record<string, string> = {};
+  
+  if (githubUrl.value) {
+    query.url = githubUrl.value;
+  }
+  
+  if (options.value.fromTag) {
+    query.fromTag = options.value.fromTag;
+  }
+  
+  if (options.value.toTag) {
+    query.toTag = options.value.toTag;
+  }
+  
+  if (options.value.excludeTypes && options.value.excludeTypes.length > 0) {
+    query.excludeTypes = JSON.stringify(options.value.excludeTypes);
+  }
+  
+  if (options.value.useGitmojis !== undefined) {
+    query.useGitmojis = options.value.useGitmojis.toString();
+  }
+  
+  if (options.value.reverseOrder !== undefined) {
+    query.reverseOrder = options.value.reverseOrder.toString();
+  }
+  
+  router.replace({ query });
+}
+
 async function generate() {
   loading.value = true;
   error.value = "";
@@ -136,6 +264,24 @@ async function generate() {
 
   try {
     const generator = new ChangelogGenerator(token.value);
+    const cacheKey = `changelog-${githubUrl.value}-${
+      options.value.fromTag || ""
+    }-${options.value.toTag || ""}`;
+    
+    const cachedResult = localStorage.getItem(cacheKey);
+    if (cachedResult) {
+      try {
+        const parsed = JSON.parse(cachedResult);
+        if (parsed.timestamp && Date.now() - parsed.timestamp < 3600000) {
+          changelog.value = parsed.changelog;
+          fromTag.value = parsed.fromTag;
+          toTag.value = parsed.toTag;
+          loading.value = false;
+          return;
+        }
+      } catch (e) {}
+    }
+    
     const result = await generator.generate({
       githubUrl: githubUrl.value,
       ...options.value,
@@ -144,6 +290,16 @@ async function generate() {
     changelog.value = result.changelog;
     fromTag.value = result.fromTag;
     toTag.value = result.toTag;
+    
+    localStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        changelog: result.changelog,
+        fromTag: result.fromTag,
+        toTag: result.toTag,
+        timestamp: Date.now(),
+      })
+    );
   } catch (e: any) {
     error.value = e.message || "An unexpected error occurred";
   } finally {
@@ -284,7 +440,13 @@ input[type="password"]:focus {
   flex-shrink: 0;
 }
 
-.copy-button {
+.button-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.copy-button,
+.json-button {
   background-color: #21262d;
   color: #c9d1d9;
   padding: 0.5rem 1rem;
@@ -293,9 +455,13 @@ input[type="password"]:focus {
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
-.copy-button:hover {
+.copy-button:hover,
+.json-button:hover {
   background-color: #30363d;
   border-color: #8b949e;
 }
@@ -452,6 +618,12 @@ input[type="password"]:focus {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
+  }
+
+  .button-group {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
   }
 }
 </style>
