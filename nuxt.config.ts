@@ -8,9 +8,11 @@ export default defineNuxtConfig({
         process.env.NODE_ENV === "production"
           ? [
               {
-                src: "https://plausible.pandadev.net/js/script.pageview-props.tagged-events.js",
+                src: "https://rybbit.pandadev.net/api/script.js",
                 defer: true,
-                "data-domain": "changelog.pandadev.net",
+                "data-site-id": "3",
+                "data-session-replay": "true",
+                "data-track-errors": "true"
               },
             ]
           : [],
