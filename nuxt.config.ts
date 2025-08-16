@@ -11,8 +11,6 @@ export default defineNuxtConfig({
                 src: "https://rybbit.pandadev.net/api/script.js",
                 defer: true,
                 "data-site-id": "3",
-                "data-session-replay": "true",
-                "data-track-errors": "true"
               },
             ]
           : [],
