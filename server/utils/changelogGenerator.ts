@@ -3,8 +3,9 @@ import type {
   ParsedCommit,
   CommitType,
   ChangelogOptions,
+  ChangelogResult,
   TagPair,
-} from "../types/types";
+} from "../../types/types";
 
 interface CacheEntry<T> {
   data: T;
@@ -93,7 +94,7 @@ export class ChangelogGenerator {
 
     const result = {
       latest: defaultBranch,
-      previous: tagDetails[0].name,
+      previous: tagDetails[0]?.name ?? "",
     };
 
     this.saveToCache(cacheKey, result);
@@ -201,34 +202,36 @@ export class ChangelogGenerator {
       { types: ["perf"], header: "Performance", icon: ":zap:" },
       { types: ["refactor"], header: "Refactors", icon: ":recycle:" },
       { types: ["test"], header: "Tests", icon: ":white_check_mark:" },
+      { types: ["style"], header: "Styles", icon: ":art:" },
       {
         types: ["build", "ci"],
         header: "Build",
         icon: ":construction_worker:",
       },
       { types: ["docs"], header: "Documentation", icon: ":memo:" },
+      { types: ["chore"], header: "Chores", icon: ":wrench:" },
+      { types: ["revert"], header: "Reverts", icon: ":rewind:" },
       { types: ["other"], header: "Other Changes", icon: ":flying_saucer:" },
     ];
 
     const sections: string[] = [];
     const processedCommits = new Set<string>();
+    const excludeTypes = options.excludeTypes || [];
+    const excludeScopes = options.excludeScopes || [];
+    const scopeExcluded = (c: ParsedCommit) =>
+      excludeScopes.length > 0 && !!c.scope && excludeScopes.includes(c.scope);
 
     if (options.reverseOrder) commits.reverse();
 
     for (const type of types) {
-      if (
-        type.types[0] !== "other" &&
-        options.excludeTypes?.includes(type.types[0])
-      )
-        continue;
+      if (type.types.some((t) => excludeTypes.includes(t))) continue;
 
-      const typeCommits = commits.filter(
-        (c) =>
-          type.types.includes(c.type || "other") &&
-          (!options.excludeScopes?.length ||
-            !c.scope ||
-            !options.excludeScopes.includes(c.scope))
-      );
+      const isCatchAll = type.types[0] === "other";
+      const typeCommits = commits.filter((c) => {
+        if (processedCommits.has(c.sha) || scopeExcluded(c)) return false;
+        if (isCatchAll) return true;
+        return type.types.includes(c.type || "other");
+      });
 
       if (typeCommits.length) {
         const header = options.useGitmojis
@@ -257,18 +260,15 @@ export class ChangelogGenerator {
     const regex = /github\.com\/([^/]+)\/([^/]+)/;
     const match = url.match(regex);
     if (!match) throw new Error("Invalid GitHub URL");
-    return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
+    return {
+      owner: match[1] || "",
+      repo: (match[2] || "").replace(/\.git$/, ""),
+    };
   }
 
-  async generate(
-    options: ChangelogOptions
-  ): Promise<{ changelog: string; fromTag: string; toTag: string }> {
+  async generate(options: ChangelogOptions): Promise<ChangelogResult> {
     const cacheKey = this.getCacheKey("generate", options);
-    const cached = this.getFromCache<{
-      changelog: string;
-      fromTag: string;
-      toTag: string;
-    }>(cacheKey);
+    const cached = this.getFromCache<ChangelogResult>(cacheKey);
     if (cached) return cached;
 
     const { owner, repo } = this.parseGithubUrl(options.githubUrl);
@@ -278,8 +278,8 @@ export class ChangelogGenerator {
     const commits = await this.getCommits(owner, repo, head, base);
 
     if (commits.length === 0) {
-      const result = {
-        changelog: "No changes found between these versions.",
+      const result: ChangelogResult = {
+        markdown: "No changes found between these versions.",
         fromTag: base,
         toTag: head,
       };
@@ -288,8 +288,8 @@ export class ChangelogGenerator {
     }
 
     const parsedCommits = this.parseCommits(commits);
-    const result = {
-      changelog: this.generateChangelogFromCommits(
+    const result: ChangelogResult = {
+      markdown: this.generateChangelogFromCommits(
         parsedCommits,
         { latest: head, previous: base },
         options

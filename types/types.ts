@@ -1,7 +1,3 @@
-import type { RestEndpointMethodTypes } from '@octokit/plugin-rest-endpoint-methods';
-
-export type CommitData = RestEndpointMethodTypes['repos']['compareCommits']['response']['data']['commits'][number];
-
 export interface ParsedCommit {
   type?: string;
   scope?: string;
@@ -35,4 +31,10 @@ export interface ChangelogOptions {
 export interface TagPair {
   latest: string;
   previous: string;
+}
+
+export interface ChangelogResult {
+  markdown: string;
+  fromTag: string;
+  toTag: string;
 }

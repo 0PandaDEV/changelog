@@ -2,6 +2,12 @@
 export default defineNuxtConfig({
   compatibilityDate: "2024-11-01",
   devtools: { enabled: false },
+  ssr: true,
+  vite: {
+    build: {
+      modulePreload: { polyfill: false },
+    },
+  },
   app: {
     head: {
       script:
@@ -14,16 +20,12 @@ export default defineNuxtConfig({
               },
             ]
           : [],
-      link: [
-        {
-          rel: "preload",
-          href: "/github-markdown-css/github-markdown-dark.css",
-          as: "style",
-        },
-      ],
     },
   },
   nitro: {
     preset: "cloudflare-pages",
+    cloudflare: {
+      nodeCompat: true,
+    },
   },
 });

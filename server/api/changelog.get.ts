@@ -1,5 +1,4 @@
-import { ChangelogGenerator } from "~/lib/changelogGenerator";
-import type { ChangelogOptions } from "~/types/types";
+import type { ChangelogOptions } from "../../types/types";
 
 interface ChangelogJson {
   version: string;
@@ -14,48 +13,45 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
 
   if (!query.url) {
-    setResponseStatus(event, 400);
-    return { error: "GitHub URL is required" };
+    throw createError({
+      statusCode: 400,
+      statusMessage: "GitHub URL is required",
+    });
   }
 
+  const options: Partial<ChangelogOptions> = {
+    githubUrl: query.url as string,
+    excludeTypes: query.excludeTypes
+      ? JSON.parse(query.excludeTypes as string)
+      : ["build", "docs", "other", "style"],
+    includeRefIssues: query.includeRefIssues === "true",
+    useGitmojis: query.useGitmojis !== "false",
+    includeInvalidCommits: query.includeInvalidCommits !== "false",
+    reverseOrder: query.reverseOrder === "true",
+  };
+
+  if (query.fromTag) options.fromTag = query.fromTag as string;
+  if (query.toTag) options.toTag = query.toTag as string;
+
+  const authHeader = getHeader(event, "authorization");
+  const token = authHeader ? authHeader.replace("Bearer ", "") : "";
+
   try {
-    const options: Partial<ChangelogOptions> = {
-      githubUrl: query.url as string,
-      excludeTypes: query.excludeTypes
-        ? JSON.parse(query.excludeTypes as string)
-        : ["build", "docs", "other", "style"],
-      includeRefIssues: query.includeRefIssues === "true",
-      useGitmojis: query.useGitmojis !== "false",
-      includeInvalidCommits: query.includeInvalidCommits !== "false",
-      reverseOrder: query.reverseOrder === "true",
-    };
-
-    if (query.fromTag) {
-      options.fromTag = query.fromTag as string;
-    }
-
-    if (query.toTag) {
-      options.toTag = query.toTag as string;
-    }
-
-    const authHeader = getHeader(event, "authorization");
-    const token = authHeader ? authHeader.replace("Bearer ", "") : "";
-
     const generator = new ChangelogGenerator(token);
     const result = await generator.generate(options as ChangelogOptions);
 
-    const jsonData: ChangelogJson = parseChangelogToJson(result.changelog);
+    const jsonData: ChangelogJson = parseChangelogToJson(result.markdown);
     jsonData.fromTag = result.fromTag;
     jsonData.toTag = result.toTag;
-    jsonData.markdown = result.changelog;
+    jsonData.markdown = result.markdown;
 
     setHeader(event, "Content-Type", "application/json");
     return jsonData;
   } catch (error: any) {
-    setResponseStatus(event, 500);
-    return {
-      error: error.message || "An error occurred generating the changelog",
-    };
+    throw createError({
+      statusCode: 500,
+      statusMessage: error.message || "An error occurred generating the changelog",
+    });
   }
 });
 
@@ -70,8 +66,8 @@ function parseChangelogToJson(markdownChangelog: string): ChangelogJson {
     if (line.startsWith("## ")) {
       const versionMatch = line.match(/## \[(.*?)\] - (.*)/);
       if (versionMatch) {
-        version = versionMatch[1];
-        date = versionMatch[2];
+        version = versionMatch[1] || "";
+        date = versionMatch[2] || "";
       }
     } else if (line.startsWith("### ")) {
       currentSection = line.replace(/^### (:[\w+-]+: )?/, "").trim();
@@ -94,9 +90,5 @@ function parseChangelogToJson(markdownChangelog: string): ChangelogJson {
     }
   }
 
-  return {
-    version,
-    date,
-    sections,
-  };
+  return { version, date, sections };
 }
