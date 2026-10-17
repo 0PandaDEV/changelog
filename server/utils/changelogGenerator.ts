@@ -8,6 +8,7 @@ import type {
   RefsResult,
 } from "#shared/types/changelog";
 import type { ParsedGithubInput } from "#shared/utils/github";
+import { parseGithubInput, githubCompareUrl } from "#shared/utils/github";
 
 interface CacheEntry<T> {
   data: T;
@@ -75,6 +76,7 @@ export class ChangelogGenerator {
     this.authed = !!token;
     this.octokit = new Octokit({
       auth: token || undefined,
+      log: { debug() {}, info() {}, warn() {}, error() {} },
       request: { signal: AbortSignal.timeout(REQUEST_TIMEOUT) },
     });
   }
