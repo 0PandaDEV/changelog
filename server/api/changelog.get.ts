@@ -1,94 +1,55 @@
 import type { ChangelogOptions } from "../../types/types";
 
-interface ChangelogJson {
-  version: string;
-  date: string;
-  sections: Record<string, any>;
-  fromTag?: string;
-  toTag?: string;
-  markdown?: string;
+const DEFAULT_EXCLUDE: string[] = [];
+
+function parseList(value: unknown): string[] {
+  if (typeof value !== "string") return DEFAULT_EXCLUDE;
+  if (!value) return DEFAULT_EXCLUDE;
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch {}
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function str(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
+  const url = str(query.url);
 
-  if (!query.url) {
+  if (!url) {
     throw createError({
       statusCode: 400,
       statusMessage: "GitHub URL is required",
     });
   }
 
-  const options: Partial<ChangelogOptions> = {
-    githubUrl: query.url as string,
-    excludeTypes: query.excludeTypes
-      ? JSON.parse(query.excludeTypes as string)
-      : ["build", "docs", "other", "style"],
-    includeRefIssues: query.includeRefIssues === "true",
+  const options: ChangelogOptions = {
+    githubUrl: url,
+    base: str(query.base),
+    head: str(query.head),
+    fromTag: str(query.fromTag),
+    toTag: str(query.toTag),
+    excludeTypes: parseList(query.excludeTypes),
     useGitmojis: query.useGitmojis !== "false",
-    includeInvalidCommits: query.includeInvalidCommits !== "false",
     reverseOrder: query.reverseOrder === "true",
   };
 
-  if (query.fromTag) options.fromTag = query.fromTag as string;
-  if (query.toTag) options.toTag = query.toTag as string;
-
   const authHeader = getHeader(event, "authorization");
-  const token = authHeader ? authHeader.replace("Bearer ", "") : "";
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : "";
 
   try {
-    const generator = new ChangelogGenerator(token);
-    const result = await generator.generate(options as ChangelogOptions);
-
-    const jsonData: ChangelogJson = parseChangelogToJson(result.markdown);
-    jsonData.fromTag = result.fromTag;
-    jsonData.toTag = result.toTag;
-    jsonData.markdown = result.markdown;
-
-    setHeader(event, "Content-Type", "application/json");
-    return jsonData;
+    return await new ChangelogGenerator(token).generate(options);
   } catch (error: any) {
     throw createError({
-      statusCode: 500,
+      statusCode: error.statusCode || 500,
       statusMessage: error.message || "An error occurred generating the changelog",
     });
   }
 });
-
-function parseChangelogToJson(markdownChangelog: string): ChangelogJson {
-  const lines = markdownChangelog.split("\n");
-  let version = "";
-  let date = "";
-  const sections: Record<string, any> = {};
-  let currentSection = "";
-
-  for (const line of lines) {
-    if (line.startsWith("## ")) {
-      const versionMatch = line.match(/## \[(.*?)\] - (.*)/);
-      if (versionMatch) {
-        version = versionMatch[1] || "";
-        date = versionMatch[2] || "";
-      }
-    } else if (line.startsWith("### ")) {
-      currentSection = line.replace(/^### (:[\w+-]+: )?/, "").trim();
-      sections[currentSection] = [];
-    } else if (line.startsWith("- ") && currentSection) {
-      const commitMatch = line.match(
-        /- \[`(.*?)`\]\((.*?)\) - (?:(?:\*\*(.*?)\*\*: ))?(.*)(?:(?: by \[@(.*?)\]\((.*?)\)))?/
-      );
-      if (commitMatch) {
-        const [, hash, url, scope, subject, author, authorUrl] = commitMatch;
-        sections[currentSection].push({
-          hash,
-          url,
-          scope: scope || null,
-          subject,
-          author: author || null,
-          authorUrl: authorUrl || null,
-        });
-      }
-    }
-  }
-
-  return { version, date, sections };
-}

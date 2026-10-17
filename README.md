@@ -58,12 +58,15 @@ GET /api/changelog?url=https://github.com/owner/repo
 
 #### Query Parameters
 
-- `url`: GitHub repository URL (required)
-- `fromTag`: Starting tag (optional)
-- `toTag`: Ending tag (optional)
-- `excludeTypes`: JSON array of commit types to exclude
+- `url`: GitHub repository URL or compare URL (`.../compare/base...head`) (required)
+- `base`: Starting branch, tag or commit (optional, defaults to the latest tag)
+- `head`: Ending branch, tag or commit (optional, defaults to the default branch)
+- `fromTag` / `toTag`: aliases for `base` / `head`
+- `excludeTypes`: JSON array or comma separated list of commit types to exclude
 - `useGitmojis`: "true" or "false" (defaults to true)
 - `reverseOrder`: "true" or "false" (defaults to false)
+
+`GET /api/refs?url=https://github.com/owner/repo` returns `{ defaultBranch, branches, tags }`.
 
 #### Authentication
 

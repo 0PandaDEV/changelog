@@ -17,24 +17,41 @@ export interface CommitType {
 
 export interface ChangelogOptions {
   githubUrl: string;
+  base?: string;
+  head?: string;
   fromTag?: string;
   toTag?: string;
   excludeTypes?: string[];
   excludeScopes?: string[];
-  restrictToTypes?: string[];
-  includeRefIssues?: boolean;
   useGitmojis?: boolean;
-  includeInvalidCommits?: boolean;
   reverseOrder?: boolean;
 }
 
-export interface TagPair {
-  latest: string;
-  previous: string;
+export interface ChangelogEntry {
+  hash: string;
+  url: string;
+  scope: string | null;
+  subject: string;
+  author: string | null;
+  authorUrl: string | null;
 }
 
 export interface ChangelogResult {
   markdown: string;
+  version: string;
+  date: string;
+  sections: Record<string, ChangelogEntry[]>;
+  base: string;
+  head: string;
   fromTag: string;
   toTag: string;
+  totalCommits: number;
+  truncated: boolean;
+  compareUrl: string;
+}
+
+export interface RefsResult {
+  defaultBranch: string;
+  branches: string[];
+  tags: string[];
 }
