@@ -7,7 +7,8 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "build:action": "esbuild action/index.ts --bundle --platform=node --target=node24 --format=cjs --alias:#shared=./shared --outfile=action/dist/index.cjs"
   },
   "dependencies": {
     "@octokit/rest": "22.0.1",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
     "sass-embedded": "^1.105.2",
     "typescript": "^7.0.2",
     "vue-tsc": "^3.3.13"

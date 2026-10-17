@@ -1,0 +1,53 @@
+name: Changelog Generator
+description: Generate a changelog from conventional commits between any two refs of a GitHub repository
+author: PandaDEV
+branding:
+  icon: list
+  color: green
+inputs:
+  token:
+    description: GitHub token used to read the repository
+    default: ${{ github.token }}
+  repository:
+    description: Repository as owner/repo or any GitHub URL
+    default: ${{ github.repository }}
+  base:
+    description: Branch, tag or commit to start from. Defaults to the previous tag, or the latest release
+    required: false
+  head:
+    description: Branch, tag or commit to end at. Defaults to the pushed tag, or the default branch
+    required: false
+  exclude-types:
+    description: Comma separated commit types to leave out, for example "chore,docs"
+    default: ""
+  exclude-scopes:
+    description: Comma separated commit scopes to leave out
+    default: ""
+  use-gitmojis:
+    description: Show an icon in front of each section header
+    default: "true"
+  reverse-order:
+    description: List the oldest commits first
+    default: "false"
+  output-file:
+    description: Write the markdown to this file, relative to the workspace
+    required: false
+  step-summary:
+    description: Also add the changelog to the job summary
+    default: "false"
+outputs:
+  markdown:
+    description: The changelog as markdown
+  json:
+    description: The changelog as JSON, same shape as the API response
+  base:
+    description: Resolved base ref
+  head:
+    description: Resolved head ref
+  total-commits:
+    description: Number of commits between base and head
+  compare-url:
+    description: GitHub compare URL for the range
+runs:
+  using: node24
+  main: action/dist/index.cjs
