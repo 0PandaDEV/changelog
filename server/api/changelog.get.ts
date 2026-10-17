@@ -1,4 +1,4 @@
-import type { ChangelogOptions } from "../../types/types";
+import type { ChangelogOptions } from "#shared/types/changelog";
 
 const DEFAULT_EXCLUDE: string[] = [];
 

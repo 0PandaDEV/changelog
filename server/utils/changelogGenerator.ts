@@ -6,9 +6,8 @@ import type {
   ChangelogResult,
   ChangelogEntry,
   RefsResult,
-} from "../../types/types";
-import type { ParsedGithubInput } from "../../shared/utils/github";
-import { parseGithubInput, githubCompareUrl } from "../../shared/utils/github";
+} from "#shared/types/changelog";
+import type { ParsedGithubInput } from "#shared/utils/github";
 
 interface CacheEntry<T> {
   data: T;

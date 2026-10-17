@@ -149,7 +149,7 @@
 <script setup lang="ts">
 import MarkdownIt from "markdown-it";
 import * as emoji from "node-emoji";
-import type { ChangelogResult, RefsResult } from "./types/types";
+import type { ChangelogResult, RefsResult } from "#shared/types/changelog";
 
 useSeoMeta({
   title: "Changelog Generator",
