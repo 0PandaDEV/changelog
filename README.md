@@ -63,3 +63,49 @@ For private repos or higher rate limits, send `Authorization: Bearer <github tok
 ```
 
 `/api/refs` returns `{ defaultBranch, branches, tags }`.
+
+## GitHub Action
+
+Generate a changelog inside a workflow. It runs in the job and reads GitHub with the job token, nothing goes through the hosted site.
+
+```yaml
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: 0PandaDEV/changelog@main
+        id: changelog
+        with:
+          exclude-types: chore,docs
+      - run: gh release create "$TAG" --notes "$NOTES"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          NOTES: ${{ steps.changelog.outputs.markdown }}
+```
+
+On a tag push, `head` is the tag and `base` is the previous tag. Otherwise `head` is the default branch and `base` is the latest release.
+
+| Input | Description |
+| --- | --- |
+| `token` | Defaults to `github.token`. Use a personal token for other private repos. |
+| `repository` | `owner/repo` or any GitHub URL. Defaults to the current repo. |
+| `base`, `head` | Branch, tag or commit. |
+| `exclude-types`, `exclude-scopes` | Comma separated lists. |
+| `use-gitmojis` | `false` to hide section icons. |
+| `reverse-order` | `true` for oldest first. |
+| `output-file` | Also write the markdown to this path. |
+| `step-summary` | `true` to add the changelog to the job summary. |
+
+Outputs: `markdown`, `json`, `base`, `head`, `total-commits`, `compare-url`.
+
+After changing the generator, run `bun run build:action` and commit `action/dist`.
