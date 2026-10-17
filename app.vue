@@ -6,44 +6,127 @@
         <img src="/logo.webp" alt="Logo" class="logo" />
         <h1>Changelog Generator</h1>
       </div>
-      <form @submit.prevent="generate">
+      <form @submit.prevent="submit">
         <div class="input-group">
-          <label for="githubUrl">GitHub URL:</label>
+          <label for="githubUrl">Repository or compare URL:</label>
           <input
             id="githubUrl"
             v-model="githubUrl"
             type="text"
             placeholder="https://github.com/owner/repo"
+            autocomplete="off"
+            @input="onUrlInput"
+            @paste="onUrlPaste"
+            @blur="onUrlBlur"
           />
+          <span v-if="repoLabel" class="hint">{{ repoLabel }}</span>
         </div>
         <div class="input-group">
           <label for="token">GitHub Token (optional):</label>
           <input id="token" v-model="token" type="password" />
         </div>
-        <div class="input-group">
-          <label for="fromTag">From Tag (optional):</label>
-          <input id="fromTag" v-model="options.fromTag" type="text" />
+        <div v-if="suggestions.length" class="input-group">
+          <label>Suggestions:</label>
+          <div class="type-grid">
+            <button
+              v-for="s in suggestions"
+              :key="s.label"
+              type="button"
+              class="type-chip suggestion"
+              @click="applySuggestion(s)"
+            >
+              {{ s.label }}
+            </button>
+          </div>
+        </div>
+        <div class="compare">
+          <div class="input-group">
+            <label for="base">Base (branch, tag or commit):</label>
+            <input
+              id="base"
+              v-model="base"
+              type="text"
+              list="refs"
+              :placeholder="refs?.tags[0] || 'latest tag'"
+              autocomplete="off"
+            />
+          </div>
+          <button
+            type="button"
+            class="swap-button"
+            title="Swap base and head"
+            @click="swap"
+          >
+            ⇅
+          </button>
+          <div class="input-group">
+            <label for="head">Head (branch, tag or commit):</label>
+            <input
+              id="head"
+              v-model="head"
+              type="text"
+              list="refs"
+              :placeholder="refs?.defaultBranch || 'default branch'"
+              autocomplete="off"
+            />
+          </div>
+          <datalist id="refs">
+            <option v-for="b in refs?.branches" :key="'b' + b" :value="b">
+              branch
+            </option>
+            <option v-for="t in refs?.tags" :key="'t' + t" :value="t">
+              tag
+            </option>
+          </datalist>
         </div>
         <div class="input-group">
-          <label for="toTag">To Tag (optional):</label>
-          <input id="toTag" v-model="options.toTag" type="text" />
+          <label>Include:</label>
+          <div class="type-grid">
+            <label v-for="t in allTypes" :key="t" class="type-chip">
+              <input
+                type="checkbox"
+                :checked="!excludeTypes.includes(t)"
+                @change="toggleType(t)"
+              />
+              {{ t }}
+            </label>
+          </div>
+        </div>
+        <div class="input-group toggles">
+          <label class="type-chip">
+            <input type="checkbox" v-model="useGitmojis" /> Gitmojis
+          </label>
+          <label class="type-chip">
+            <input type="checkbox" v-model="reverseOrder" /> Oldest first
+          </label>
         </div>
         <button type="submit" class="generate-button" :disabled="loading">
-          {{ loading ? "Generating..." : "Generate Changelog" }}
+          {{ loading ? "Generating..." : "Compare" }}
         </button>
+        <a
+          v-if="githubLink"
+          class="github-link"
+          :href="githubLink"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open on GitHub ↗
+        </a>
       </form>
-      <div v-if="loading" class="loading">Loading...</div>
-      <div v-if="error" class="error-output">
+      <div v-if="errorText" class="error-output">
         <h2>Error</h2>
-        <pre>{{ error.statusMessage || error.message }}</pre>
+        <pre>{{ errorText }}</pre>
       </div>
     </div>
     <div class="content">
-      <div v-if="changelog" class="changelog-output">
+      <div v-if="result" class="changelog-output">
         <div class="changelog-header">
           <div class="changelog-info">
             <h2>Changelog</h2>
-            <span class="tag-range">{{ fromTag }} → {{ toTag }}</span>
+            <span class="tag-range">
+              {{ result.base || "start" }} → {{ result.head }} ·
+              {{ result.totalCommits }} commits
+            </span>
           </div>
           <div class="button-group">
             <button class="copy-button" @click="copyChangelog">
@@ -54,6 +137,9 @@
             </a>
           </div>
         </div>
+        <p v-if="result.truncated" class="truncated">
+          Too many commits, this list is incomplete.
+        </p>
         <div v-html="markdownToHtml" class="markdown-content"></div>
       </div>
     </div>
@@ -63,13 +149,7 @@
 <script setup lang="ts">
 import MarkdownIt from "markdown-it";
 import * as emoji from "node-emoji";
-import type { ChangelogResult } from "./types/types";
-
-interface ChangelogApiResponse extends ChangelogResult {
-  version: string;
-  date: string;
-  sections: Record<string, any>;
-}
+import type { ChangelogResult, RefsResult } from "./types/types";
 
 useSeoMeta({
   title: "Changelog Generator",
@@ -104,128 +184,303 @@ useHead({
   ],
 });
 
-const githubUrl = ref("");
+interface Suggestion {
+  label: string;
+  base: string;
+  head: string;
+}
+
+const allTypes = [
+  "feat",
+  "fix",
+  "perf",
+  "refactor",
+  "test",
+  "style",
+  "build",
+  "ci",
+  "docs",
+  "chore",
+  "revert",
+  "other",
+];
+
+const route = useRoute();
+const router = useRouter();
+
+function queryString(key: string): string {
+  const value = route.query[key];
+  return (Array.isArray(value) ? value[0] : value) || "";
+}
+
+function queryTypes(): string[] {
+  const raw = queryString("excludeTypes");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch {}
+  return raw.split(",").filter(Boolean);
+}
+
+const githubUrl = ref(queryString("url"));
 const token = ref("");
+const base = ref(queryString("base") || queryString("fromTag"));
+const head = ref(queryString("head") || queryString("toTag"));
+const excludeTypes = ref<string[]>(queryTypes());
+const useGitmojis = ref(queryString("useGitmojis") !== "false");
+const reverseOrder = ref(queryString("reverseOrder") === "true");
 const copied = ref(false);
-const options = ref({
-  fromTag: "",
-  toTag: "",
-  excludeTypes: ["build", "docs", "other", "style"],
-  useGitmojis: true,
-  reverseOrder: false,
-});
+const liveRefs = ref<RefsResult | null>(null);
+const liveRefsFor = ref("");
 
-const query = computed(() => {
-  const params: Record<string, string> = { url: githubUrl.value };
-  if (options.value.fromTag) params.fromTag = options.value.fromTag;
-  if (options.value.toTag) params.toTag = options.value.toTag;
-  if (options.value.excludeTypes?.length)
-    params.excludeTypes = JSON.stringify(options.value.excludeTypes);
-  if (options.value.useGitmojis !== undefined)
-    params.useGitmojis = options.value.useGitmojis.toString();
-  if (options.value.reverseOrder !== undefined)
-    params.reverseOrder = options.value.reverseOrder.toString();
+const repoKey = computed(() => keyOf(githubUrl.value));
+
+const repoLabel = computed(() => repoKey.value);
+
+function authHeaders(): Record<string, string> {
+  return import.meta.client && token.value
+    ? { Authorization: `Bearer ${token.value}` }
+    : {};
+}
+
+function buildQuery(source: {
+  url: string;
+  base: string;
+  head: string;
+  excludeTypes: string[];
+  useGitmojis: boolean;
+  reverseOrder: boolean;
+}): Record<string, string> {
+  const params: Record<string, string> = { url: source.url };
+  if (source.base) params.base = source.base;
+  if (source.head) params.head = source.head;
+  if (source.excludeTypes.length)
+    params.excludeTypes = JSON.stringify(source.excludeTypes);
+  if (!source.useGitmojis) params.useGitmojis = "false";
+  if (source.reverseOrder) params.reverseOrder = "true";
   return params;
+}
+
+const routeQuery = computed(() =>
+  buildQuery({
+    url: queryString("url"),
+    base: queryString("base") || queryString("fromTag"),
+    head: queryString("head") || queryString("toTag"),
+    excludeTypes: queryTypes(),
+    useGitmojis: queryString("useGitmojis") !== "false",
+    reverseOrder: queryString("reverseOrder") === "true",
+  })
+);
+
+const {
+  data: result,
+  error,
+  status,
+  refresh,
+} = await useAsyncData<ChangelogResult | null>(
+  "changelog",
+  async () => {
+    if (!routeQuery.value.url) return null;
+    return await $fetch<ChangelogResult>("/api/changelog", {
+      query: routeQuery.value,
+      headers: authHeaders(),
+    });
+  },
+  { watch: [routeQuery] }
+);
+
+const { data: routeRefs } = await useAsyncData<RefsResult | null>(
+  "refs",
+  async () => {
+    const url = routeQuery.value.url;
+    if (!url || !parseGithubInput(url)) return null;
+    try {
+      return await $fetch<RefsResult>("/api/refs", {
+        query: { url },
+        headers: authHeaders(),
+      });
+    } catch {
+      return null;
+    }
+  },
+  { watch: [() => routeQuery.value.url] }
+);
+
+function keyOf(input: string): string {
+  const parsed = parseGithubInput(input);
+  return parsed ? `${parsed.owner}/${parsed.repo}` : "";
+}
+
+const refs = computed(() => {
+  if (liveRefsFor.value && liveRefsFor.value === repoKey.value)
+    return liveRefs.value;
+  const routeKey = keyOf(routeQuery.value.url ?? "");
+  return routeKey && routeKey === repoKey.value ? routeRefs.value : null;
 });
 
-const headers = computed(() => {
-  const h: Record<string, string> = {};
-  if (token.value) h.Authorization = `Bearer ${token.value}`;
-  return h;
-});
-
-const { data, pending, error, execute } = useFetch<ChangelogApiResponse>(
-  "/api/changelog",
-  {
-    query,
-    headers,
-    immediate: false,
-    watch: false,
+const suggestions = computed<Suggestion[]>(() => {
+  const r = refs.value;
+  if (!r) return [];
+  const list: Suggestion[] = [];
+  const [t0, t1, t2] = r.tags;
+  if (t0) list.push({ label: `${t0} → ${r.defaultBranch}`, base: t0, head: r.defaultBranch });
+  if (t0 && t1) list.push({ label: `${t1} → ${t0}`, base: t1, head: t0 });
+  if (t1 && t2) list.push({ label: `${t2} → ${t1}`, base: t2, head: t1 });
+  if (r.tags.length > 1) {
+    const last = r.tags[r.tags.length - 1]!;
+    list.push({ label: `${last} → ${t0}`, base: last, head: t0! });
   }
-);
-
-const changelog = computed(() => data.value?.markdown || "");
-const fromTag = computed(() => data.value?.fromTag || "");
-const toTag = computed(() => data.value?.toTag || "");
-const loading = computed(() => pending.value);
-const jsonApiUrl = computed(
-  () => `/api/changelog?${new URLSearchParams(query.value).toString()}`
-);
-
-const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
+  if (!r.tags.length) list.push({ label: `All of ${r.defaultBranch}`, base: "", head: r.defaultBranch });
+  return list;
 });
+
+const githubLink = computed(() => {
+  const parsed = parseGithubInput(githubUrl.value);
+  if (!parsed) return "";
+  const r = result.value;
+  const sameRepo =
+    !!r &&
+    r.compareUrl.startsWith(`https://github.com/${parsed.owner}/${parsed.repo}/`);
+  const typedBase = base.value.trim();
+  const typedHead = head.value.trim();
+  const matchesResult =
+    sameRepo &&
+    (!typedBase || typedBase === r?.base) &&
+    (!typedHead || typedHead === r?.head);
+  if (r && matchesResult) return r.compareUrl;
+  const h = typedHead || (sameRepo && r ? r.head : "") || refs.value?.defaultBranch || "";
+  return githubCompareUrl(parsed, typedBase, h);
+});
+
+const loading = computed(() => status.value === "pending");
+const errorText = computed(() => {
+  const e: any = error.value;
+  if (!e) return "";
+  return e.data?.statusMessage || e.statusMessage || e.message || "Something went wrong";
+});
+
+const jsonApiUrl = computed(
+  () => `/api/changelog?${new URLSearchParams(routeQuery.value).toString()}`
+);
+
+const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
 
 const markdownToHtml = computed(() => {
-  let content = changelog.value;
-  content = content.replace(/:([\w+-]+):/g, (match, code) => {
-    const e = emoji.get(code);
-    return e || match;
-  });
+  const content = (result.value?.markdown || "").replace(
+    /:([\w+-]+):/g,
+    (match, code) => emoji.get(code) || match
+  );
   return `<div class="markdown-body">${md.render(content)}</div>`;
 });
 
-async function generate() {
-  if (!githubUrl.value) return;
-  await execute();
+function applyUrlInput(value: string) {
+  const parsed = parseGithubInput(value);
+  if (!parsed) return;
+  const hadRef = parsed.base || parsed.head;
+  if (hadRef) {
+    base.value = parsed.base || "";
+    head.value = parsed.head || "";
+  }
+  githubUrl.value = githubRepoUrl(parsed);
+}
+
+let refsTimer: ReturnType<typeof setTimeout> | undefined;
+
+function onUrlInput() {
+  if (!import.meta.client) return;
+  clearTimeout(refsTimer);
+  refsTimer = setTimeout(loadLiveRefs, 400);
+}
+
+function onUrlPaste(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData("text");
+  if (!text || !parseGithubInput(text)) return;
+  event.preventDefault();
+  applyUrlInput(text);
+  loadLiveRefs();
+}
+
+function onUrlBlur() {
+  applyUrlInput(githubUrl.value);
+  loadLiveRefs();
+}
+
+async function loadLiveRefs() {
+  const parsed = parseGithubInput(githubUrl.value);
+  if (!parsed) return;
+  const key = `${parsed.owner}/${parsed.repo}`;
+  if (liveRefsFor.value === key && liveRefs.value) return;
+  if (refs.value && repoKey.value === key) return;
+  try {
+    liveRefs.value = await $fetch<RefsResult>("/api/refs", {
+      query: { url: githubRepoUrl(parsed) },
+      headers: authHeaders(),
+    });
+    liveRefsFor.value = key;
+  } catch {
+    liveRefs.value = null;
+    liveRefsFor.value = "";
+  }
+}
+
+async function submit() {
+  applyUrlInput(githubUrl.value);
+  if (!parseGithubInput(githubUrl.value)) return;
+  const next = buildQuery({
+    url: githubUrl.value,
+    base: base.value.trim(),
+    head: head.value.trim(),
+    excludeTypes: excludeTypes.value,
+    useGitmojis: useGitmojis.value,
+    reverseOrder: reverseOrder.value,
+  });
+  const same = JSON.stringify(next) === JSON.stringify(routeQuery.value);
+  await router.push({ query: next });
+  if (same) await refresh();
+}
+
+function applySuggestion(s: Suggestion) {
+  base.value = s.base;
+  head.value = s.head;
+  submit();
+}
+
+function swap() {
+  [base.value, head.value] = [head.value, base.value];
+}
+
+function toggleType(type: string) {
+  excludeTypes.value = excludeTypes.value.includes(type)
+    ? excludeTypes.value.filter((t) => t !== type)
+    : [...excludeTypes.value, type];
 }
 
 async function copyChangelog() {
-  await navigator.clipboard.writeText(changelog.value);
+  if (!result.value) return;
+  await navigator.clipboard.writeText(result.value.markdown);
   copied.value = true;
   setTimeout(() => (copied.value = false), 2000);
 }
 
-function updateUrlParams() {
-  if (!import.meta.client) return;
-  const params = new URLSearchParams();
-  if (githubUrl.value) params.set("url", githubUrl.value);
-  if (options.value.fromTag) params.set("fromTag", options.value.fromTag);
-  if (options.value.toTag) params.set("toTag", options.value.toTag);
-  if (options.value.excludeTypes?.length)
-    params.set("excludeTypes", JSON.stringify(options.value.excludeTypes));
-  if (options.value.useGitmojis !== undefined)
-    params.set("useGitmojis", options.value.useGitmojis.toString());
-  if (options.value.reverseOrder !== undefined)
-    params.set("reverseOrder", options.value.reverseOrder.toString());
-  window.history.replaceState(null, "", `?${params.toString()}`);
-}
-
-function loadFromUrl() {
-  if (!import.meta.client) return;
-  const params = new URLSearchParams(window.location.search);
-  if (params.has("url")) githubUrl.value = params.get("url")!;
-  if (params.has("fromTag")) options.value.fromTag = params.get("fromTag")!;
-  if (params.has("toTag")) options.value.toTag = params.get("toTag")!;
-  if (params.has("excludeTypes")) {
-    try {
-      const parsed = JSON.parse(params.get("excludeTypes")!);
-      if (Array.isArray(parsed)) options.value.excludeTypes = parsed;
-    } catch {}
-  }
-  if (params.has("useGitmojis"))
-    options.value.useGitmojis = params.get("useGitmojis") === "true";
-  if (params.has("reverseOrder"))
-    options.value.reverseOrder = params.get("reverseOrder") === "true";
-}
-
-watch([githubUrl, options], updateUrlParams, { deep: true });
-
 watch(token, (newToken) => {
   if (!import.meta.client) return;
-  if (newToken) localStorage.setItem("github-token", newToken);
-  else localStorage.removeItem("github-token");
+  try {
+    if (newToken) localStorage.setItem("github-token", newToken);
+    else localStorage.removeItem("github-token");
+  } catch {}
 });
 
 onMounted(async () => {
-  loadFromUrl();
-  if (import.meta.client) {
-    const saved = localStorage.getItem("github-token");
-    if (saved) token.value = saved;
+  let saved = "";
+  try {
+    saved = localStorage.getItem("github-token") || "";
+  } catch {}
+  if (saved) {
+    token.value = saved;
+    if (error.value) await refresh();
   }
-  if (githubUrl.value) await generate();
+  if (githubUrl.value && !refs.value) loadLiveRefs();
 });
 </script>
 
@@ -410,14 +665,14 @@ input[type="password"] {
     }
   }
 
-  :deep(blockquote) {
+  blockquote {
     margin: 16px 0;
     padding: 0 1em;
     color: $muted;
     border-left: 0.25em solid $border;
   }
 
-  :deep(hr) {
+  hr {
     height: 0.25em;
     padding: 0;
     margin: 24px 0;
@@ -425,7 +680,7 @@ input[type="password"] {
     border: 0;
   }
 
-  :deep(table) {
+  table {
     display: block;
     width: 100%;
     width: max-content;
@@ -455,13 +710,13 @@ input[type="password"] {
     }
   }
 
-  :deep(img) {
+  img {
     max-width: 100%;
     box-sizing: content-box;
     background-color: #0d1117;
   }
 
-  :deep(pre) {
+  pre {
     padding: 16px;
     overflow: auto;
     font-size: 85%;
@@ -481,6 +736,87 @@ input[type="password"] {
 .error-output {
   margin-top: 1rem;
   color: #f85149;
+
+  pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+.compare {
+  position: relative;
+}
+
+.swap-button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: transparent;
+  color: $muted;
+  border: 1px solid $border;
+  border-radius: 6px;
+  padding: 0.1rem 0.5rem;
+  cursor: pointer;
+
+  &:hover {
+    color: $text;
+    border-color: $muted;
+  }
+}
+
+.type-grid,
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-weight: 400;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid $border;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.github-link {
+  display: block;
+  margin-top: 0.75rem;
+  text-align: center;
+  color: $accent;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: $muted;
+}
+
+.suggestion {
+  background: transparent;
+  color: $text;
+  font-family: inherit;
+
+  &:hover {
+    border-color: $accent;
+  }
+}
+
+.truncated {
+  color: $muted;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
 }
 
 .markdown-body {
