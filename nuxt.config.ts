@@ -6,6 +6,7 @@ export default defineNuxtConfig({
   vite: {
     build: {
       modulePreload: { polyfill: false },
+      chunkSizeWarningLimit: 1500,
     },
   },
   app: {
