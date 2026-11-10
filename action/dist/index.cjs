@@ -4169,12 +4169,9 @@ ${body.join("\n")}`);
           base || (oldest ? `${head}@{${oldest.sha}}` : ""),
           head
         );
-        const header = `## [${head}] - ${date}`;
         const body = commits.length ? markdown || "No changes match the selected filters." : "No changes found between these refs.";
         return {
-          markdown: `${header}
-
-${body}
+          markdown: `${body}
 `,
           version: head,
           date,

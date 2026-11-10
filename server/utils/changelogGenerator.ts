@@ -368,13 +368,12 @@ export class ChangelogGenerator {
           head
         );
 
-        const header = `## [${head}] - ${date}`;
         const body = commits.length
           ? markdown || "No changes match the selected filters."
           : "No changes found between these refs.";
 
         return {
-          markdown: `${header}\n\n${body}\n`,
+          markdown: `${body}\n`,
           version: head,
           date,
           sections,
